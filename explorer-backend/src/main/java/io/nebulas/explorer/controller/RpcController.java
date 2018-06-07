@@ -1,6 +1,7 @@
 package io.nebulas.explorer.controller;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -283,7 +284,11 @@ public class RpcController {
 		}
 		double base = Math.pow(10, 18);
 		JsonResult result = JsonResult.success();
-		result.put("balance", address.getCurrentBalance().divide(new BigDecimal(base), 8).toString());
+		String balance = "0";
+		if (address.getCurrentBalance() != null && address.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
+			balance = address.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toString();
+		}
+		result.put("balance", balance);
 		int page = 1;
 		int pageSize = 500;
 		boolean loop = true;
@@ -306,7 +311,7 @@ public class RpcController {
 		if (!txList.isEmpty()) {
 			vol24h = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8)
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8, RoundingMode.FLOOR)
 					.toPlainString();
 		}
 
@@ -315,7 +320,7 @@ public class RpcController {
 		if (!txList.isEmpty()) {
 			vol7d = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8)
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8, RoundingMode.FLOOR)
 					.toPlainString();
 		}
 		long tx24h = 0;
