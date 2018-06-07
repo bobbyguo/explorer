@@ -297,6 +297,7 @@ public class RpcController {
 			List<NebTransaction> list = nebTransactionService.findTxnByTo(hash, page, pageSize);
 			loop = list.size() == pageSize;
 			txList.addAll(list);
+			page++;
 		} while (loop);
 
 		// Daily active users
