@@ -281,8 +281,9 @@ public class RpcController {
 		if (null == address) {
 			return JsonResult.failed();
 		}
+		double base = Math.pow(10, 18);
 		JsonResult result = JsonResult.success();
-		result.put("balance", address.getBalance());
+		result.put("balance", address.getCurrentBalance().divide(new BigDecimal(base), 8).toString());
 		int page = 1;
 		int pageSize = 500;
 		boolean loop = true;
@@ -305,15 +306,16 @@ public class RpcController {
 		if (!txList.isEmpty()) {
 			vol24h = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8)
 					.toPlainString();
 		}
 
+		
 		String vol7d = "0";
 		if (!txList.isEmpty()) {
 			vol7d = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8)
 					.toPlainString();
 		}
 		long tx24h = 0;
