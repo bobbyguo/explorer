@@ -1,31 +1,52 @@
 package io.nebulas.explorer.controller;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+
+import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.LocalDate;
+import org.joda.time.LocalDateTime;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import io.nebulas.explorer.domain.*;
+
+import io.nebulas.explorer.domain.BlockSummary;
+import io.nebulas.explorer.domain.NebAddress;
+import io.nebulas.explorer.domain.NebBlock;
+import io.nebulas.explorer.domain.NebPendingTransaction;
+import io.nebulas.explorer.domain.NebTransaction;
 import io.nebulas.explorer.enums.NebTransactionStatusEnum;
 import io.nebulas.explorer.model.JsonResult;
 import io.nebulas.explorer.model.PageIterator;
 import io.nebulas.explorer.model.vo.AddressVo;
 import io.nebulas.explorer.model.vo.BlockVo;
 import io.nebulas.explorer.model.vo.TransactionVo;
-import io.nebulas.explorer.service.blockchain.*;
+import io.nebulas.explorer.service.blockchain.NebAddressService;
+import io.nebulas.explorer.service.blockchain.NebBlockService;
+import io.nebulas.explorer.service.blockchain.NebDynastyService;
+import io.nebulas.explorer.service.blockchain.NebMarketCapitalizationService;
+import io.nebulas.explorer.service.blockchain.NebTransactionService;
 import io.nebulas.explorer.service.thirdpart.nebulas.NebApiServiceWrapper;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.GetAccountStateResponse;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.beanutils.PropertyUtils;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.LocalDate;
-import org.joda.time.LocalDateTime;
-import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 /**
  * Explorer http rpc gateway
@@ -253,6 +274,66 @@ public class RpcController {
         });
         return result;
     }
+    
+    @RequestMapping("/dapp/{hash}")
+	public JsonResult dapp(@PathVariable("hash") String hash) {
+		NebAddress address = nebAddressService.getNebAddressByHash(hash);
+		if (null == address) {
+			return JsonResult.failed();
+		}
+		JsonResult result = JsonResult.success();
+		result.put("balance", address.getBalance());
+		int page = 1;
+		int pageSize = 500;
+		boolean loop = true;
+		List<NebTransaction> txList = Lists.newLinkedList();
+		do {
+			List<NebTransaction> list = nebTransactionService.findTxnByTo(hash, page, pageSize);
+			loop = list.size() == pageSize;
+			txList.addAll(list);
+		} while (loop);
+
+		// Daily active users
+		long dau = 0;
+		if (!txList.isEmpty()) {
+			dau = txList.parallelStream()
+					.filter(tx -> LocalDate.fromDateFields(tx.getTimestamp()).equals(LocalDate.now()))
+					.map(tx -> tx.getFrom()).distinct().count();
+		}
+
+		String vol24h = "0";
+		if (!txList.isEmpty()) {
+			vol24h = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.toPlainString();
+		}
+
+		String vol7d = "0";
+		if (!txList.isEmpty()) {
+			vol7d = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.toPlainString();
+		}
+		long tx24h = 0;
+		if (!txList.isEmpty()) {
+			tx24h = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24))).count();
+		}
+		long tx7d = 0;
+		if (!txList.isEmpty()) {
+			tx7d = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7))).count();
+		}
+
+		result.put("dau", dau);
+		result.put("vol24h", vol24h);
+		result.put("vol7d", vol7d);
+		result.put("tx24h", tx24h);
+		result.put("tx7d", tx7d);
+		return result;
+	}
 
     @RequestMapping("/address/{hash}")
     public JsonResult address(@PathVariable("hash") String hash) {
@@ -397,4 +478,5 @@ public class RpcController {
         }
         return txnVoList;
     }
+    
 }

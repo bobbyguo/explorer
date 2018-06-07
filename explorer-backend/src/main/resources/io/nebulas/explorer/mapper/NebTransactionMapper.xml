@@ -116,6 +116,14 @@
         ORDER BY `block_height` DESC,`tx_seq` ASC
         LIMIT ${offset},${limit}
     </select>
+    
+    <select id="findTxnByTo" parameterType="map" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM `neb_transaction`
+        WHERE `to` = #{addressHash,jdbcType=VARCHAR}
+        LIMIT ${offset},${limit}
+    </select>
 
     <select id="findTxnOrderById" parameterType="map" resultMap="BaseResultMap">
         SELECT

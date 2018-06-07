@@ -35,6 +35,8 @@ public interface NebTransactionMapper {
     List<NebTransaction> findTxnByCondition(@Param("blockHeight") Long blockHeight, @Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
 
     List<NebTransaction> findTxnByFromTo(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
+    
+    List<NebTransaction> findTxnByTo(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
 
     List<NebTransaction> findTxnOrderById(@Param("offset") int offset, @Param("limit") int limit);
 

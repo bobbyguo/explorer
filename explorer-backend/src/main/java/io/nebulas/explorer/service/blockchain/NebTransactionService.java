@@ -196,6 +196,13 @@ public class NebTransactionService {
         }
         return nebTransactionMapper.findTxnByFromTo(addressHash, (page - 1) * pageSize, pageSize);
     }
+    
+    public List<NebTransaction> findTxnByTo(String addressHash, int page, int pageSize) {
+        if (StringUtils.isEmpty(addressHash)) {
+            return Collections.emptyList();
+        }
+        return nebTransactionMapper.findTxnByTo(addressHash, (page - 1) * pageSize, pageSize);
+    }
 
     /**
      * query transaction information list
