@@ -60,7 +60,7 @@ public class DataConsensusJob {
     private final StringRedisTemplate redisTemplate;
     private final YAMLConfig myConfig;
     
-    ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+    private static ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
 
     private static final Base64.Decoder DECODER = Base64.getDecoder();
 
