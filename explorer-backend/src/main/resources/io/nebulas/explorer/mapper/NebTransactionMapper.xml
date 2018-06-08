@@ -209,7 +209,7 @@
         LIMIT ${offset},${limit}
     </select>
     
-    <select id="recent7days" resultMap="map" parameterType="map">
+    <select id="recent7days" resultType="map" parameterType="map">
         select * from (select date(`timestamp`) as d, count(1) as c from neb_transaction 
         where `to` = #{addressHash,jdbcType=VARCHAR} 
         group by date(timestamp)) a 
