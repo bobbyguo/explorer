@@ -377,7 +377,7 @@ public class RpcController {
 		Future<List<Map<String, String>>> topAccounts = EXECUTOR.submit(() -> {
 			int p = 1;
 			int ps = 20;
-			Set<String> r = Sets.newHashSet();
+			Set<String> r = Sets.newLinkedHashSet();
 			do {
 				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
@@ -413,7 +413,7 @@ public class RpcController {
 		Future<List<Map<String, String>>> recentAccounts = EXECUTOR.submit(() -> {
 			int p = 1;
 			int ps = 20;
-			Set<String> r = Sets.newHashSet();
+			Set<String> r = Sets.newLinkedHashSet();
 			do {
 				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
