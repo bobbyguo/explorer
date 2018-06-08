@@ -22,10 +22,11 @@ public class SyncBalanceJob {
 
 	private final NebAddressService nebAddressService;
     private final NebApiServiceWrapper nebApiServiceWrapper;
-    boolean isRuning = false;
+    static boolean isRuning = false;
 	@Scheduled(cron = "0 0/30 * * * ?")
 	public void sync() {
 		try {
+			log.info("sync balance started...");
 			if (isRuning) return;
 			else isRuning = true;
 			int page = 1;
@@ -47,6 +48,7 @@ public class SyncBalanceJob {
 			} while(loop);
 		} finally {
 			isRuning = false;
+			log.info("sync balance ended...");
 		}
 
 	}
