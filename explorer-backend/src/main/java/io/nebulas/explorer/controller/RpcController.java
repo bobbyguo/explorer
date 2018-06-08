@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -373,47 +374,88 @@ public class RpcController {
 		result.put("tx7d", tx7d);
 		result.put("tx", tx);
 		
-		Future<List<String>> topAccounts = EXECUTOR.submit(() -> {
+		Future<List<Map<String, String>>> topAccounts = EXECUTOR.submit(() -> {
 			int p = 1;
 			int ps = 20;
-			List<String> r = Lists.newArrayList();
+			Set<String> r = Sets.newHashSet();
 			do {
 				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
 			} while(r.size() < 10);
 			
-			return r;
+			return r.parallelStream().map(e -> {
+				Map<String, String> map = new HashMap<>();
+				map.put("address", e);
+				NebAddress na = nebAddressService.getNebAddressByHash(e);
+				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+						String b = accountState.getBalance();
+						address.setCurrentBalance(new BigDecimal(b));
+						nebAddressService.updateAddressBalance(hash, b);
+					}
+				}
+				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+				return map;
+			}).collect(Collectors.toList());
 		});
 		
-		Future<List<String>> topTxs = EXECUTOR.submit(() -> {
+		Future<List<Map<String,String>>> topTxs = EXECUTOR.submit(() -> {
 			List<NebTransaction> list = nebTransactionService.findTopTxn(hash, 1, 10);
-			List<String> r = list.stream().map(e -> e.getHash()).collect(Collectors.toList());
-			return r;
+			return list.parallelStream().map(e -> {
+				Map<String, String> map = new HashMap<>();
+				map.put("txHash", e.getHash());
+				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+				return map;
+			}).collect(Collectors.toList());
 		});
 		
-		Future<List<String>> recentAccounts = EXECUTOR.submit(() -> {
+		Future<List<Map<String, String>>> recentAccounts = EXECUTOR.submit(() -> {
 			int p = 1;
 			int ps = 20;
-			List<String> r = Lists.newArrayList();
+			Set<String> r = Sets.newHashSet();
 			do {
 				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
 			} while(r.size() < 10);
 		
-			return r;
+			return r.parallelStream().map(e -> {
+				Map<String, String> map = new HashMap<>();
+				map.put("address", e);
+				NebAddress na = nebAddressService.getNebAddressByHash(e);
+				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+						String b = accountState.getBalance();
+						address.setCurrentBalance(new BigDecimal(b));
+						nebAddressService.updateAddressBalance(hash, b);
+					}
+				}
+				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+				return map;
+			}).collect(Collectors.toList());
 		}); 
 		
-		Future<List<String>> recentTxs = EXECUTOR.submit(() -> {
+		Future<List<Map<String,String>>> recentTxs = EXECUTOR.submit(() -> {
 			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 10);
-			List<String> r = list.stream().map(e -> e.getHash()).collect(Collectors.toList());
-			return r;
+			return list.parallelStream().map(e -> {
+				Map<String, String> map = new HashMap<>();
+				map.put("txHash", e.getHash());
+				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+				return map;
+			}).collect(Collectors.toList());
 		}); 
+		
+		Future<List<Map<String,Integer>>> trend7days = EXECUTOR.submit(() -> {
+			return nebTransactionService.recent7days(hash);
+		});
 		
 		try {
 			result.put("topAccounts", topAccounts.get());
 			result.put("topTxs", topTxs.get());
 			result.put("recentAccounts", recentAccounts.get());
 			result.put("recentTxs", recentTxs.get());
+			result.put("trend7days", trend7days.get());
 		} catch (InterruptedException | ExecutionException e) {
 			log.error("error", e);
 		}

@@ -56,4 +56,5 @@ public interface NebTransactionMapper {
 
     List<NebTransaction> findRecentTxn(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
 
+    List<Map<String, Integer>> recent7days(@Param("addressHash") String addressHash);
 }

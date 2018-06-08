@@ -9,6 +9,7 @@ import io.nebulas.explorer.mapper.NebTransactionMapper;
 import lombok.AllArgsConstructor;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.annotations.Param;
 import org.joda.time.LocalDate;
 import org.springframework.stereotype.Service;
 
@@ -223,6 +224,10 @@ public class NebTransactionService {
             return Collections.emptyList();
         }
         return nebTransactionMapper.findRecentTxn(addressHash, (page - 1) * pageSize, pageSize);
+    }
+    
+    public List<Map<String, Integer>> recent7days(String addressHash) {
+    	return nebTransactionMapper.recent7days(addressHash);
     }
 
     /**
