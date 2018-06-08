@@ -374,8 +374,14 @@ public class RpcController {
 		result.put("tx", tx);
 		
 		Future<List<String>> topAccounts = EXECUTOR.submit(() -> {
-			List<NebTransaction> list = nebTransactionService.findTopAccount(hash, 1, 20);
-			List<String> r = list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList());
+			int p = 1;
+			int ps = 20;
+			List<String> r = Lists.newArrayList();
+			do {
+				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
+				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+			} while(r.size() < 10);
+			
 			return r;
 		});
 		
@@ -386,8 +392,14 @@ public class RpcController {
 		});
 		
 		Future<List<String>> recentAccounts = EXECUTOR.submit(() -> {
-			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 20);
-			List<String> r = list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList());
+			int p = 1;
+			int ps = 20;
+			List<String> r = Lists.newArrayList();
+			do {
+				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
+				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+			} while(r.size() < 10);
+		
 			return r;
 		}); 
 		

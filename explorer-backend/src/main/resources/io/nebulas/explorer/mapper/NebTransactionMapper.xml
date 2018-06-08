@@ -184,7 +184,7 @@
     
     <select id="findTopAccount" parameterType="map" resultMap="BaseResultMap">
         SELECT
-        <include refid="Base_Column_List"/>
+        nt.*
         from neb_transaction nt, neb_address na 
         where nt.`to` = #{addressHash,jdbcType=VARCHAR} and nt.`from` = na.`hash`
         order by na.current_balance desc
