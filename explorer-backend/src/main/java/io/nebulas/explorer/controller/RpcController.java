@@ -397,7 +397,7 @@ public class RpcController {
 				}
 				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
 				return map;
-			}).collect(Collectors.toList());
+			}).limit(10).collect(Collectors.toList());
 		});
 		
 		Future<List<Map<String,String>>> topTxs = EXECUTOR.submit(() -> {
@@ -433,7 +433,7 @@ public class RpcController {
 				}
 				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
 				return map;
-			}).collect(Collectors.toList());
+			}).limit(10).collect(Collectors.toList());
 		}); 
 		
 		Future<List<Map<String,String>>> recentTxs = EXECUTOR.submit(() -> {
