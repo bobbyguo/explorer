@@ -203,6 +203,27 @@ public class NebTransactionService {
         }
         return nebTransactionMapper.findTxnByTo(addressHash, (page - 1) * pageSize, pageSize);
     }
+    
+    public List<NebTransaction> findTopAccount(String addressHash, int page, int pageSize) {
+        if (StringUtils.isEmpty(addressHash)) {
+            return Collections.emptyList();
+        }
+        return nebTransactionMapper.findTopAccount(addressHash, (page - 1) * pageSize, pageSize);
+    }
+    
+    public List<NebTransaction> findTopTxn(String addressHash, int page, int pageSize) {
+        if (StringUtils.isEmpty(addressHash)) {
+            return Collections.emptyList();
+        }
+        return nebTransactionMapper.findTopTxn(addressHash, (page - 1) * pageSize, pageSize);
+    }
+    
+    public List<NebTransaction> findRecentTxn(String addressHash, int page, int pageSize) {
+        if (StringUtils.isEmpty(addressHash)) {
+            return Collections.emptyList();
+        }
+        return nebTransactionMapper.findRecentTxn(addressHash, (page - 1) * pageSize, pageSize);
+    }
 
     /**
      * query transaction information list

@@ -1,7 +1,24 @@
 package io.nebulas.explorer.jobs;
 
+import static com.alibaba.fastjson.JSON.toJSONString;
+
+import java.math.BigDecimal;
+import java.util.Base64;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.LocalDateTime;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+
 import io.nebulas.explorer.config.YAMLConfig;
 import io.nebulas.explorer.domain.BlockSyncRecord;
 import io.nebulas.explorer.domain.NebAddress;
@@ -9,25 +26,19 @@ import io.nebulas.explorer.domain.NebBlock;
 import io.nebulas.explorer.domain.NebTransaction;
 import io.nebulas.explorer.enums.NebAddressTypeEnum;
 import io.nebulas.explorer.enums.NebTransactionTypeEnum;
-import io.nebulas.explorer.service.blockchain.*;
+import io.nebulas.explorer.service.blockchain.BlockSyncRecordService;
+import io.nebulas.explorer.service.blockchain.NebAddressService;
+import io.nebulas.explorer.service.blockchain.NebBlockService;
+import io.nebulas.explorer.service.blockchain.NebDynastyService;
+import io.nebulas.explorer.service.blockchain.NebTransactionService;
 import io.nebulas.explorer.service.thirdpart.nebulas.NebApiServiceWrapper;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.Block;
+import io.nebulas.explorer.service.thirdpart.nebulas.bean.GetAccountStateResponse;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.NebState;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.Transaction;
 import io.nebulas.explorer.util.BlockHelper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import static com.alibaba.fastjson.JSON.toJSONString;
 
 /**
  * Data check Job
@@ -48,6 +59,8 @@ public class DataConsensusJob {
     private final NebApiServiceWrapper nebApiServiceWrapper;
     private final StringRedisTemplate redisTemplate;
     private final YAMLConfig myConfig;
+    
+    ExecutorService es = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
 
     private static final Base64.Decoder DECODER = Base64.getDecoder();
 
@@ -126,17 +139,22 @@ public class DataConsensusJob {
                 for (Transaction tx : blk.getTransactions()) {
                     seq++;
                     addAddr(tx.getFrom(), NebAddressTypeEnum.NORMAL);
+                    syncBalance(tx.getFrom());
 
                     NebTransactionTypeEnum typeEnum = NebTransactionTypeEnum.parse(tx.getType());
 
                     if (NebTransactionTypeEnum.BINARY.equals(typeEnum)) {
                         addAddr(tx.getTo(), NebAddressTypeEnum.NORMAL);
+                        syncBalance(tx.getTo());
                     } else if (NebTransactionTypeEnum.CALL.equals(typeEnum)) {
                         addAddr(tx.getTo(), NebAddressTypeEnum.CONTRACT);
+                        syncBalance(tx.getTo());
                         String realReceiver = extractReceiverAddress(tx.getData());
                         addAddr(realReceiver, NebAddressTypeEnum.NORMAL);
+                        syncBalance(realReceiver);
                     } else if (NebTransactionTypeEnum.DEPLOY.equals(typeEnum)) {
                         addAddr(tx.getContractAddress(), NebAddressTypeEnum.NORMAL);
+                        syncBalance(tx.getContractAddress());
                     }
 
                     NebTransaction nebTx = BlockHelper.buildNebTransaction(tx, blk, seq, convertData(typeEnum, tx.getData()));
@@ -155,6 +173,23 @@ public class DataConsensusJob {
             }
         }
     }
+    
+    private void syncBalance(String hash) {
+    	es.execute(() -> {
+			NebAddress address = nebAddressService.getNebAddressByHash(hash);
+			if (null == address) {
+				return;
+			}
+			if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+				GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+				if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+					String balance = accountState.getBalance();
+					address.setCurrentBalance(new BigDecimal(balance));
+					nebAddressService.updateAddressBalance(hash, balance);
+				}
+			}	
+    	});
+    }
 
     private void saveBlock(Block blk, Long libBlkHeight) {
         NebBlock nebBlk = NebBlock.builder()
@@ -169,6 +204,8 @@ public class DataConsensusJob {
 
         addAddr(blk.getMiner(), NebAddressTypeEnum.NORMAL);
         addAddr(blk.getCoinbase(), NebAddressTypeEnum.NORMAL);
+        syncBalance(blk.getMiner());
+        syncBalance(blk.getCoinbase());
 
         NebBlock nblk = nebBlockService.getNebBlockByHash(nebBlk.getHash());
         if (nblk == null) {

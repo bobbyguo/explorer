@@ -49,4 +49,11 @@ public interface NebTransactionMapper {
     List<Map<String, String>> countTxnCntMapByTo(List<String> addressHashes);
 
     List<Map<String, Object>> countTxCntGroupByTimestamp(@Param("from") String from, @Param("to") String to);
+    
+    List<NebTransaction> findTopAccount(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
+
+    List<NebTransaction> findTopTxn(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
+
+    List<NebTransaction> findRecentTxn(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
+
 }

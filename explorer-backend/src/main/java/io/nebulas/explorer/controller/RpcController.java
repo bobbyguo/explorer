@@ -9,8 +9,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import org.apache.commons.beanutils.PropertyUtils;
@@ -282,6 +284,14 @@ public class RpcController {
 		if (null == address) {
 			return JsonResult.failed();
 		}
+		if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+			GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+			if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+				String balance = accountState.getBalance();
+				address.setCurrentBalance(new BigDecimal(balance));
+				nebAddressService.updateAddressBalance(hash, balance);
+			}
+		}
 		double base = Math.pow(10, 18);
 		JsonResult result = JsonResult.success();
 		String balance = "0";
@@ -302,44 +312,100 @@ public class RpcController {
 
 		// Daily active users
 		long dau = 0;
+		long au24h = 0;
+		long au7d = 0;
+		long au = 0;
 		if (!txList.isEmpty()) {
 			dau = txList.parallelStream()
 					.filter(tx -> LocalDate.fromDateFields(tx.getTimestamp()).equals(LocalDate.now()))
 					.map(tx -> tx.getFrom()).distinct().count();
+			
+			au24h = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
+					.map(tx -> tx.getFrom()).distinct().count();
+			
+			au7d = txList.parallelStream()
+					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
+					.map(tx -> tx.getFrom()).distinct().count();
+			
+			au = txList.parallelStream()
+					.map(tx -> tx.getFrom()).distinct().count();
+			
 		}
-
+		
 		String vol24h = "0";
+		String vol7d = "0";
+		String vol = "0";
 		if (!txList.isEmpty()) {
 			vol24h = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8, RoundingMode.FLOOR)
-					.toPlainString();
-		}
-
-		
-		String vol7d = "0";
-		if (!txList.isEmpty()) {
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
 			vol7d = txList.parallelStream()
 					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a)).divide(new BigDecimal(base), 8, RoundingMode.FLOOR)
-					.toPlainString();
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
+			
+			vol = txList.parallelStream()
+					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
 		}
+		
 		long tx24h = 0;
+		long tx7d = 0;
+		long tx = 0;
 		if (!txList.isEmpty()) {
 			tx24h = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24))).count();
-		}
-		long tx7d = 0;
-		if (!txList.isEmpty()) {
+					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusHours(24))).count();
 			tx7d = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7))).count();
+					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusDays(7))).count();
+			tx = txList.stream().count();
 		}
-
+		
 		result.put("dau", dau);
+		result.put("au24h", au24h);
+		result.put("au7d", au7d);
+		result.put("au", au);
 		result.put("vol24h", vol24h);
 		result.put("vol7d", vol7d);
+		result.put("vol", vol);
 		result.put("tx24h", tx24h);
 		result.put("tx7d", tx7d);
+		result.put("tx", tx);
+		
+		Future<List<String>> topAccounts = EXECUTOR.submit(() -> {
+			List<NebTransaction> list = nebTransactionService.findTopAccount(hash, 1, 20);
+			List<String> r = list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList());
+			return r;
+		});
+		
+		Future<List<String>> topTxs = EXECUTOR.submit(() -> {
+			List<NebTransaction> list = nebTransactionService.findTopTxn(hash, 1, 10);
+			List<String> r = list.stream().map(e -> e.getHash()).collect(Collectors.toList());
+			return r;
+		});
+		
+		Future<List<String>> recentAccounts = EXECUTOR.submit(() -> {
+			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 20);
+			List<String> r = list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList());
+			return r;
+		}); 
+		
+		Future<List<String>> recentTxs = EXECUTOR.submit(() -> {
+			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 10);
+			List<String> r = list.stream().map(e -> e.getHash()).collect(Collectors.toList());
+			return r;
+		}); 
+		
+		try {
+			result.put("topAccounts", topAccounts.get());
+			result.put("topTxs", topTxs.get());
+			result.put("recentAccounts", recentAccounts.get());
+			result.put("recentTxs", recentTxs.get());
+		} catch (InterruptedException | ExecutionException e) {
+			log.error("error", e);
+		}
+		
 		return result;
 	}
 
