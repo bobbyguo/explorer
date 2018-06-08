@@ -383,7 +383,7 @@ public class RpcController {
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
 			} while(r.size() < 10);
 			
-			return r.parallelStream().map(e -> {
+			return r.stream().map(e -> {
 				Map<String, String> map = new HashMap<>();
 				map.put("address", e);
 				NebAddress na = nebAddressService.getNebAddressByHash(e);
@@ -419,7 +419,7 @@ public class RpcController {
 				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
 			} while(r.size() < 10);
 		
-			return r.parallelStream().map(e -> {
+			return r.stream().map(e -> {
 				Map<String, String> map = new HashMap<>();
 				map.put("address", e);
 				NebAddress na = nebAddressService.getNebAddressByHash(e);
