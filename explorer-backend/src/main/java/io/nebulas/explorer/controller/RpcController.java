@@ -402,7 +402,7 @@ public class RpcController {
 		
 		Future<List<Map<String,String>>> topTxs = EXECUTOR.submit(() -> {
 			List<NebTransaction> list = nebTransactionService.findTopTxn(hash, 1, 10);
-			return list.parallelStream().map(e -> {
+			return list.stream().map(e -> {
 				Map<String, String> map = new HashMap<>();
 				map.put("txHash", e.getHash());
 				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
@@ -438,7 +438,7 @@ public class RpcController {
 		
 		Future<List<Map<String,String>>> recentTxs = EXECUTOR.submit(() -> {
 			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 10);
-			return list.parallelStream().map(e -> {
+			return list.stream().map(e -> {
 				Map<String, String> map = new HashMap<>();
 				map.put("txHash", e.getHash());
 				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
