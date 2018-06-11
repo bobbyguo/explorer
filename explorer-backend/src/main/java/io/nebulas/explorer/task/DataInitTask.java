@@ -43,11 +43,13 @@ public class DataInitTask {
 
 	static boolean isRunning = false;
     public void init(boolean isSync) {
+    	
+    	if (isRunning) {
+			log.warn("task is running");
+			return;
+		}
+    	
     	try {
-    		if (isRunning) {
-    			log.warn("task is running");
-    			return;
-    		}
     		isRunning = true;
     		 if (!isSync) {
     	            return;
