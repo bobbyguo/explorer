@@ -17,18 +17,19 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @AllArgsConstructor
-//@Component
+@Component
 public class SyncBalanceJob {
 
 	private final NebAddressService nebAddressService;
     private final NebApiServiceWrapper nebApiServiceWrapper;
     static boolean isRuning = false;
+	
 	@Scheduled(cron = "0 0/30 * * * ?")
 	public void sync() {
+		if (isRuning) return;
 		try {
 			log.info("sync balance started...");
-			if (isRuning) return;
-			else isRuning = true;
+			isRuning = true;
 			int page = 1;
 			int pageSize = 500;
 			boolean loop = true;
