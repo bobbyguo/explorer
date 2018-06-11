@@ -113,6 +113,8 @@ public class DataInitTask {
                 NebBlock nebBlock = nebBlockService.getNebBlockByHeight(h);
                 if (null != nebBlock && (nebBlock.getFinality() || !isLib)) {
                     log.warn("block with height {} already existed", h);
+                    Block blk = nebApiServiceWrapper.getBlockByHeight(h);
+                    blockSyncRecordService.setConfirmed(blk.getHeight(), (long) blk.getTransactions().size());
                     continue;
                 }
 

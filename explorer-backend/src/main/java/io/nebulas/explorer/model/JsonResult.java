@@ -23,6 +23,9 @@ public class JsonResult implements Serializable {
     private String msg = "";
     private Object data = EMPTY;
 
+    public JsonResult() {
+    }
+    
     private JsonResult(StatCode statCode) {
         this.code = statCode.getCode();
         this.msg = statCode.getMsg();
@@ -148,7 +151,11 @@ public class JsonResult implements Serializable {
         return JSON.toJSONString(this);
     }
 
-    @Getter
+    public void setData(Object data) {
+		this.data = data;
+	}
+
+	@Getter
     enum StatCode {
         SUCCESS(0, "success"), FAILED(1, "failed");
 
