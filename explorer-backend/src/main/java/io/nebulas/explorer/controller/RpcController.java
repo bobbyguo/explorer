@@ -395,11 +395,11 @@ public class RpcController {
     				Map<String, String> map = new HashMap<>();
     				map.put("address", e);
     				NebAddress na = nebAddressService.getNebAddressByHash(e);
-    				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
-    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+    				if (na.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(na.getHash());
     					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
     						String b = accountState.getBalance();
-    						address.setCurrentBalance(new BigDecimal(b));
+    						na.setCurrentBalance(new BigDecimal(b));
     						nebAddressService.updateAddressBalance(hash, b);
     					}
     				}
@@ -431,11 +431,11 @@ public class RpcController {
     				Map<String, String> map = new HashMap<>();
     				map.put("address", e);
     				NebAddress na = nebAddressService.getNebAddressByHash(e);
-    				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
-    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+    				if (na.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(na.getHash());
     					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
     						String b = accountState.getBalance();
-    						address.setCurrentBalance(new BigDecimal(b));
+    						na.setCurrentBalance(new BigDecimal(b));
     						nebAddressService.updateAddressBalance(hash, b);
     					}
     				}
