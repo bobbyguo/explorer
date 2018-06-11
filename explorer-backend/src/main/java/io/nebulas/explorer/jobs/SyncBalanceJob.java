@@ -24,7 +24,7 @@ public class SyncBalanceJob {
     private final NebApiServiceWrapper nebApiServiceWrapper;
     static boolean isRuning = false;
 	
-	@Scheduled(cron = "0 0 */1 * * ?")
+	@Scheduled(cron = "* * */1 * * ?")
 	public void sync() {
 		if (isRuning) return;
 		try {
