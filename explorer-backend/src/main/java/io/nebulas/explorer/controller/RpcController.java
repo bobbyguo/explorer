@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.commons.beanutils.PropertyUtils;
@@ -22,12 +23,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
 import org.joda.time.LocalDateTime;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -73,6 +76,7 @@ public class RpcController {
     private final NebMarketCapitalizationService nebMarketCapitalizationService;
     private final NebDynastyService nebDynastyService;
     private final NebApiServiceWrapper nebApiServiceWrapper;
+    private final StringRedisTemplate redisTemplate;
 
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(20);
 
@@ -281,186 +285,194 @@ public class RpcController {
     
     @RequestMapping("/dapp/{hash}")
 	public JsonResult dapp(@PathVariable("hash") String hash) {
-		NebAddress address = nebAddressService.getNebAddressByHash(hash);
-		if (null == address) {
-			return JsonResult.failed();
-		}
-		if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
-			GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
-			if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
-				String balance = accountState.getBalance();
-				address.setCurrentBalance(new BigDecimal(balance));
-				nebAddressService.updateAddressBalance(hash, balance);
-			}
-		}
-		double base = Math.pow(10, 18);
-		JsonResult result = JsonResult.success();
-		String balance = "0";
-		if (address.getCurrentBalance() != null && address.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
-			balance = address.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toString();
-		}
-		result.put("balance", balance);
-		int page = 1;
-		int pageSize = 500;
-		boolean loop = true;
-		List<NebTransaction> txList = Lists.newLinkedList();
-		do {
-			List<NebTransaction> list = nebTransactionService.findTxnByTo(hash, page, pageSize);
-			loop = list.size() == pageSize;
-			txList.addAll(list);
-			page++;
-		} while (loop);
+    	String existKey = "dapp-key-" + hash;
+    	String valueKey = "dapp-key-" + hash;
+    	if (redisTemplate.opsForValue().setIfAbsent(existKey, "1")) {
+    		redisTemplate.expire(existKey, 5, TimeUnit.MINUTES);
+    		NebAddress address = nebAddressService.getNebAddressByHash(hash);
+    		if (null == address) {
+    			return JsonResult.failed();
+    		}
+    		if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+    			GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+    			if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+    				String balance = accountState.getBalance();
+    				address.setCurrentBalance(new BigDecimal(balance));
+    				nebAddressService.updateAddressBalance(hash, balance);
+    			}
+    		}
+    		double base = Math.pow(10, 18);
+    		JsonResult result = JsonResult.success();
+    		String balance = "0";
+    		if (address.getCurrentBalance() != null && address.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
+    			balance = address.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toString();
+    		}
+    		result.put("balance", balance);
+    		int page = 1;
+    		int pageSize = 500;
+    		boolean loop = true;
+    		List<NebTransaction> txList = Lists.newLinkedList();
+    		do {
+    			List<NebTransaction> list = nebTransactionService.findTxnByTo(hash, page, pageSize);
+    			loop = list.size() == pageSize;
+    			txList.addAll(list);
+    			page++;
+    		} while (loop);
 
-		// Daily active users
-		long dau = 0;
-		long au24h = 0;
-		long au7d = 0;
-		long au = 0;
-		if (!txList.isEmpty()) {
-			dau = txList.parallelStream()
-					.filter(tx -> LocalDate.fromDateFields(tx.getTimestamp()).equals(LocalDate.now()))
-					.map(tx -> tx.getFrom()).distinct().count();
-			
-			au24h = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
-					.map(tx -> tx.getFrom()).distinct().count();
-			
-			au7d = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
-					.map(tx -> tx.getFrom()).distinct().count();
-			
-			au = txList.parallelStream()
-					.map(tx -> tx.getFrom()).distinct().count();
-			
-		}
+    		// Daily active users
+    		long dau = 0;
+    		long au24h = 0;
+    		long au7d = 0;
+    		long au = 0;
+    		if (!txList.isEmpty()) {
+    			dau = txList.parallelStream()
+    					.filter(tx -> LocalDate.fromDateFields(tx.getTimestamp()).equals(LocalDate.now()))
+    					.map(tx -> tx.getFrom()).distinct().count();
+    			
+    			au24h = txList.parallelStream()
+    					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
+    					.map(tx -> tx.getFrom()).distinct().count();
+    			
+    			au7d = txList.parallelStream()
+    					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
+    					.map(tx -> tx.getFrom()).distinct().count();
+    			
+    			au = txList.parallelStream()
+    					.map(tx -> tx.getFrom()).distinct().count();
+    			
+    		}
+    		
+    		String vol24h = "0";
+    		String vol7d = "0";
+    		String vol = "0";
+    		if (!txList.isEmpty()) {
+    			vol24h = txList.parallelStream()
+    					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
+    					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+    					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
+    			vol7d = txList.parallelStream()
+    					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
+    					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+    					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
+    			
+    			vol = txList.parallelStream()
+    					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
+    					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
+    		}
+    		
+    		long tx24h = 0;
+    		long tx7d = 0;
+    		long tx = 0;
+    		if (!txList.isEmpty()) {
+    			tx24h = txList.parallelStream()
+    					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusHours(24))).count();
+    			tx7d = txList.parallelStream()
+    					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusDays(7))).count();
+    			tx = txList.stream().count();
+    		}
+    		
+    		result.put("dau", dau);
+    		result.put("au24h", au24h);
+    		result.put("au7d", au7d);
+    		result.put("au", au);
+    		result.put("vol24h", vol24h);
+    		result.put("vol7d", vol7d);
+    		result.put("vol", vol);
+    		result.put("tx24h", tx24h);
+    		result.put("tx7d", tx7d);
+    		result.put("tx", tx);
+    		
+    		Future<List<Map<String, String>>> topAccounts = EXECUTOR.submit(() -> {
+    			int p = 1;
+    			int ps = 20;
+    			Set<String> r = Sets.newLinkedHashSet();
+    			do {
+    				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
+    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+    			} while(r.size() < 10);
+    			
+    			return r.stream().map(e -> {
+    				Map<String, String> map = new HashMap<>();
+    				map.put("address", e);
+    				NebAddress na = nebAddressService.getNebAddressByHash(e);
+    				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+    					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+    						String b = accountState.getBalance();
+    						address.setCurrentBalance(new BigDecimal(b));
+    						nebAddressService.updateAddressBalance(hash, b);
+    					}
+    				}
+    				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+    				return map;
+    			}).limit(10).collect(Collectors.toList());
+    		});
+    		
+    		Future<List<Map<String,String>>> topTxs = EXECUTOR.submit(() -> {
+    			List<NebTransaction> list = nebTransactionService.findTopTxn(hash, 1, 10);
+    			return list.stream().map(e -> {
+    				Map<String, String> map = new HashMap<>();
+    				map.put("txHash", e.getHash());
+    				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+    				return map;
+    			}).collect(Collectors.toList());
+    		});
+    		
+    		Future<List<Map<String, String>>> recentAccounts = EXECUTOR.submit(() -> {
+    			int p = 1;
+    			int ps = 20;
+    			Set<String> r = Sets.newLinkedHashSet();
+    			do {
+    				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
+    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+    			} while(r.size() < 10);
+    		
+    			return r.stream().map(e -> {
+    				Map<String, String> map = new HashMap<>();
+    				map.put("address", e);
+    				NebAddress na = nebAddressService.getNebAddressByHash(e);
+    				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+    					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
+    					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+    						String b = accountState.getBalance();
+    						address.setCurrentBalance(new BigDecimal(b));
+    						nebAddressService.updateAddressBalance(hash, b);
+    					}
+    				}
+    				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+    				return map;
+    			}).limit(10).collect(Collectors.toList());
+    		}); 
+    		
+    		Future<List<Map<String,String>>> recentTxs = EXECUTOR.submit(() -> {
+    			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 10);
+    			return list.stream().map(e -> {
+    				Map<String, String> map = new HashMap<>();
+    				map.put("txHash", e.getHash());
+    				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
+    				return map;
+    			}).collect(Collectors.toList());
+    		}); 
+    		
+    		Future<List<Map<String,Integer>>> trend7days = EXECUTOR.submit(() -> {
+    			return nebTransactionService.recent7days(hash);
+    		});
+    		
+    		try {
+    			result.put("topAccounts", topAccounts.get());
+    			result.put("topTxs", topTxs.get());
+    			result.put("recentAccounts", recentAccounts.get());
+    			result.put("recentTxs", recentTxs.get());
+    			result.put("trend7days", trend7days.get());
+    			redisTemplate.opsForValue().set(valueKey, result.toJsonString(), 5, TimeUnit.MINUTES);
+    		} catch (InterruptedException | ExecutionException e) {
+    			log.error("error", e);
+    		}
+    		
+    		return result;
+    	}
 		
-		String vol24h = "0";
-		String vol7d = "0";
-		String vol = "0";
-		if (!txList.isEmpty()) {
-			vol24h = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
-					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
-			vol7d = txList.parallelStream()
-					.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
-					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
-			
-			vol = txList.parallelStream()
-					.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
-					.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
-		}
-		
-		long tx24h = 0;
-		long tx7d = 0;
-		long tx = 0;
-		if (!txList.isEmpty()) {
-			tx24h = txList.parallelStream()
-					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusHours(24))).count();
-			tx7d = txList.parallelStream()
-					.filter(txn -> new DateTime(txn.getTimestamp()).isAfter(DateTime.now().minusDays(7))).count();
-			tx = txList.stream().count();
-		}
-		
-		result.put("dau", dau);
-		result.put("au24h", au24h);
-		result.put("au7d", au7d);
-		result.put("au", au);
-		result.put("vol24h", vol24h);
-		result.put("vol7d", vol7d);
-		result.put("vol", vol);
-		result.put("tx24h", tx24h);
-		result.put("tx7d", tx7d);
-		result.put("tx", tx);
-		
-		Future<List<Map<String, String>>> topAccounts = EXECUTOR.submit(() -> {
-			int p = 1;
-			int ps = 20;
-			Set<String> r = Sets.newLinkedHashSet();
-			do {
-				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
-				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
-			} while(r.size() < 10);
-			
-			return r.stream().map(e -> {
-				Map<String, String> map = new HashMap<>();
-				map.put("address", e);
-				NebAddress na = nebAddressService.getNebAddressByHash(e);
-				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
-					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
-					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
-						String b = accountState.getBalance();
-						address.setCurrentBalance(new BigDecimal(b));
-						nebAddressService.updateAddressBalance(hash, b);
-					}
-				}
-				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
-				return map;
-			}).limit(10).collect(Collectors.toList());
-		});
-		
-		Future<List<Map<String,String>>> topTxs = EXECUTOR.submit(() -> {
-			List<NebTransaction> list = nebTransactionService.findTopTxn(hash, 1, 10);
-			return list.stream().map(e -> {
-				Map<String, String> map = new HashMap<>();
-				map.put("txHash", e.getHash());
-				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
-				return map;
-			}).collect(Collectors.toList());
-		});
-		
-		Future<List<Map<String, String>>> recentAccounts = EXECUTOR.submit(() -> {
-			int p = 1;
-			int ps = 20;
-			Set<String> r = Sets.newLinkedHashSet();
-			do {
-				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
-				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
-			} while(r.size() < 10);
-		
-			return r.stream().map(e -> {
-				Map<String, String> map = new HashMap<>();
-				map.put("address", e);
-				NebAddress na = nebAddressService.getNebAddressByHash(e);
-				if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
-					GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
-					if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
-						String b = accountState.getBalance();
-						address.setCurrentBalance(new BigDecimal(b));
-						nebAddressService.updateAddressBalance(hash, b);
-					}
-				}
-				map.put("value", na.getCurrentBalance().divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
-				return map;
-			}).limit(10).collect(Collectors.toList());
-		}); 
-		
-		Future<List<Map<String,String>>> recentTxs = EXECUTOR.submit(() -> {
-			List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, 1, 10);
-			return list.stream().map(e -> {
-				Map<String, String> map = new HashMap<>();
-				map.put("txHash", e.getHash());
-				map.put("value", new BigDecimal(e.getValue()).divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString());
-				return map;
-			}).collect(Collectors.toList());
-		}); 
-		
-		Future<List<Map<String,Integer>>> trend7days = EXECUTOR.submit(() -> {
-			return nebTransactionService.recent7days(hash);
-		});
-		
-		try {
-			result.put("topAccounts", topAccounts.get());
-			result.put("topTxs", topTxs.get());
-			result.put("recentAccounts", recentAccounts.get());
-			result.put("recentTxs", recentTxs.get());
-			result.put("trend7days", trend7days.get());
-		} catch (InterruptedException | ExecutionException e) {
-			log.error("error", e);
-		}
-		
-		return result;
+    	return JSON.parseObject(redisTemplate.opsForValue().get(valueKey), JsonResult.class);
 	}
 
     @RequestMapping("/address/{hash}")

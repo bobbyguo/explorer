@@ -44,6 +44,10 @@ public class DataInitTask {
 	static boolean isRunning = false;
     public void init(boolean isSync) {
     	try {
+    		if (isRunning) {
+    			log.warn("task is running");
+    			return;
+    		}
     		isRunning = true;
     		 if (!isSync) {
     	            return;
@@ -63,9 +67,18 @@ public class DataInitTask {
     	        log.info("top block: {}", toJSONString(block));
 
     	        final Long goalHeight = block.getHeight();
-    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
+//    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
+    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxBlockHeight() - CPU_CORE * 4 * 2000;
     	        List<Zone> zoneList = divideZones(lastConfirmHeight, goalHeight);
     	        populateZones(zoneList);
+    	        while (EXECUTOR.getActiveCount() > 0) {
+    	        	try {
+						TimeUnit.SECONDS.sleep(10);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+    	        }
     	} finally {
     		isRunning = false;
     	}
