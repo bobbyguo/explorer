@@ -287,7 +287,7 @@ public class RpcController {
 	public JsonResult dapp(@PathVariable("hash") String hash) {
     	String existKey = "dapp-key-" + hash;
     	String valueKey = "dapp-key-" + hash;
-    	if (redisTemplate.opsForValue().setIfAbsent(existKey, "1")) {
+    	if (redisTemplate.opsForValue().setIfAbsent(existKey, "1") || true) {
     		redisTemplate.expire(existKey, 5, TimeUnit.MINUTES);
     		NebAddress address = nebAddressService.getNebAddressByHash(hash);
     		if (null == address) {
