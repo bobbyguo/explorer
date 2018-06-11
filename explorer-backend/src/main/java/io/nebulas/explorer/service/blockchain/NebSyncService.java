@@ -11,13 +11,16 @@ import io.nebulas.explorer.enums.NebTransactionTypeEnum;
 import io.nebulas.explorer.grpc.GrpcChannelService;
 import io.nebulas.explorer.service.thirdpart.nebulas.NebApiServiceWrapper;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.Block;
+import io.nebulas.explorer.service.thirdpart.nebulas.bean.GetAccountStateResponse;
 import io.nebulas.explorer.service.thirdpart.nebulas.bean.Transaction;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
@@ -214,10 +217,20 @@ public class NebSyncService {
         if (addr == null) {
             try {
                 nebAddressService.addNebAddress(hash, type.getValue());
+                addr = nebAddressService.getNebAddressByHash(hash);
             } catch (Throwable e) {
                 log.error("add address error", e);
             }
         }
+        
+        if (addr!= null && addr.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-30).toDate())) {
+			GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(addr.getHash());
+			if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
+				String balance = accountState.getBalance();
+				addr.setCurrentBalance(new BigDecimal(balance));
+				nebAddressService.updateAddressBalance(addr.getHash(), balance);
+			}
+		}	
     }
 
     private void syncAddresses(List<String> addresses) {
