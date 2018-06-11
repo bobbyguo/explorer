@@ -16,8 +16,11 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static com.alibaba.fastjson.JSON.toJSONString;
 
@@ -34,37 +37,46 @@ public class DataInitTask {
     private final BlockSyncRecordService blockSyncRecordService;
     private final NebApiServiceWrapper nebApiServiceWrapper;
     private final NebSyncService nebSyncService;
+    private static final int CPU_CORE = Runtime.getRuntime().availableProcessors();
+	private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(CPU_CORE * 2, CPU_CORE * 2, 1, TimeUnit.HOURS,
+			new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
+	static boolean isRunning = false;
     public void init(boolean isSync) {
-        if (!isSync) {
-            return;
-        }
-        NebState nebState = nebApiServiceWrapper.getNebState();
-        if (nebState == null) {
-            log.error("neb state not found");
-            return;
-        }
-        log.info("neb state: {}", toJSONString(nebState));
+    	try {
+    		isRunning = true;
+    		 if (!isSync) {
+    	            return;
+    	        }
+    	        NebState nebState = nebApiServiceWrapper.getNebState();
+    	        if (nebState == null) {
+    	            log.error("neb state not found");
+    	            return;
+    	        }
+    	        log.info("neb state: {}", toJSONString(nebState));
 
-        Block block = nebApiServiceWrapper.getBlockByHash(nebState.getTail(), false);
-        if (block == null) {
-            log.error("block by hash {} not found", nebState.getTail());
-            return;
-        }
-        log.info("top block: {}", toJSONString(block));
+    	        Block block = nebApiServiceWrapper.getBlockByHash(nebState.getTail(), false);
+    	        if (block == null) {
+    	            log.error("block by hash {} not found", nebState.getTail());
+    	            return;
+    	        }
+    	        log.info("top block: {}", toJSONString(block));
 
-        final Long goalHeight = block.getHeight();
-        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
-        List<Zone> zoneList = divideZones(lastConfirmHeight, goalHeight);
-        populateZones(zoneList);
+    	        final Long goalHeight = block.getHeight();
+    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
+    	        List<Zone> zoneList = divideZones(lastConfirmHeight, goalHeight);
+    	        populateZones(zoneList);
+    	} finally {
+    		isRunning = false;
+    	}
     }
 
     private void populateZones(List<Zone> zones) {
         if (zones.size() > 0) {
             log.info("zones {}", zones);
-            ExecutorService executor = Executors.newFixedThreadPool(1);
+//            ExecutorService executor = Executors.newFixedThreadPool(1);
             for (Zone zone : zones) {
-                executor.execute(() -> {
+                EXECUTOR.execute(() -> {
                     populate(zone.getFrom(), zone.getTo());
                 });
             }

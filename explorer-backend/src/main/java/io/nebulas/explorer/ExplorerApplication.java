@@ -40,12 +40,12 @@ public class ExplorerApplication {
         return arg -> {
             log.info("using environment: {}", myConfig.getEnvironment());
 
-            DeadlockDetector deadlockDetector = new DeadlockDetector(new DeadlockConsoleHandler(), 5, TimeUnit.SECONDS);
+            DeadlockDetector deadlockDetector = new DeadlockDetector(new DeadlockConsoleHandler(), 10, TimeUnit.SECONDS);
             deadlockDetector.start();
 
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
             scheduler.schedule(() -> {
-                sysService.init(myConfig.getSync().isSubscribe());
+//                sysService.init(myConfig.getSync().isSubscribe());
                 dataInitTask.init(myConfig.getSync().isOpen());
             }, 1500L, TimeUnit.MILLISECONDS);
         };

@@ -1,6 +1,18 @@
 package io.nebulas.explorer.grpc;
 
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+
 import com.alibaba.fastjson.JSONObject;
+
 import io.grpc.Channel;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -9,16 +21,8 @@ import io.nebulas.explorer.service.blockchain.NebBlockService;
 import io.nebulas.explorer.service.blockchain.NebSyncService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Service;
 import rpcpb.ApiServiceGrpc;
 import rpcpb.Rpc;
-
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Title.
@@ -37,9 +41,12 @@ public class GrpcClientService {
     private NebBlockService nebBlockService;
     private NebSyncService nebSyncService;
 
-    private static ExecutorService LINK_BLOCK_EXECUTOR = Executors.newFixedThreadPool(5);
-    private static ExecutorService PENDING_TX_EXECUTOR = Executors.newFixedThreadPool(20);
-    private static ExecutorService LIB_BLOCK_EXECUTOR = Executors.newFixedThreadPool(1);
+//    private static ExecutorService LINK_BLOCK_EXECUTOR = Executors.newFixedThreadPool(5);
+//    private static ExecutorService PENDING_TX_EXECUTOR = Executors.newFixedThreadPool(20);
+//    private static ExecutorService LIB_BLOCK_EXECUTOR = Executors.newFixedThreadPool(1);
+    private static final int CPU_CORE = Runtime.getRuntime().availableProcessors();
+	private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(CPU_CORE * 2, CPU_CORE * 2, 1, TimeUnit.HOURS,
+			new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     public void subscribe() {
         Channel channel = grpcChannelService.getChannel();
@@ -70,11 +77,12 @@ public class GrpcClientService {
                 String hash = data.getString("hash");
 
                 if (Const.TopicLinkBlock.equals(topic)) {
-                    LINK_BLOCK_EXECUTOR.execute(() -> processTopicLinkBlock(hash));
+                    EXECUTOR.execute(() -> processTopicLinkBlock(hash));
                 } else if (Const.TopicPendingTransaction.equals(topic)) {
-                    PENDING_TX_EXECUTOR.execute(() -> processTopicPendingTransaction(hash));
+                	//ignore pending tx for performance
+                    //PENDING_TX_EXECUTOR.execute(() -> processTopicPendingTransaction(hash));
                 } else if (Const.TopicLibBlock.equals(topic)) {
-                    LIB_BLOCK_EXECUTOR.execute(() -> processTopicLibBlock(hash));
+                    EXECUTOR.execute(() -> processTopicLibBlock(hash));
                 }
             }
 
@@ -102,7 +110,7 @@ public class GrpcClientService {
         };
 
         asyncStub.subscribe(Rpc.SubscribeRequest.newBuilder()
-                .addTopics(Const.TopicPendingTransaction)
+//                .addTopics(Const.TopicPendingTransaction)
                 .addTopics(Const.TopicLinkBlock)
                 .addTopics(Const.TopicLibBlock)
                 .build(), responseObserver);

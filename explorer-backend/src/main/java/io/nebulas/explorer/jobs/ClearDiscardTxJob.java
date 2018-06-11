@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @AllArgsConstructor
-@Component
+//don't clear for performance
+//@Component  
 public class ClearDiscardTxJob {
     private NebTransactionService nebTransactionService;
     private final YAMLConfig myConfig;

@@ -49,7 +49,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j(topic = "subscribe")
 @AllArgsConstructor
-@Component
+//@Component
 public class DataConsensusJob {
     private final NebBlockService nebBlockService;
     private final NebAddressService nebAddressService;
