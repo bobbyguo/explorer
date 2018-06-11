@@ -104,7 +104,7 @@ public class DataInitTask {
         Block latestLibBlk = nebApiServiceWrapper.getLatestLibBlock();
         log.info("get latestIrreversibleBlk height={}", latestLibBlk.getHeight());
 
-        for (long h = from; h < to; ) {
+        for (long h = from; h < to; h++) {
             blockSyncRecordService.add(new BlockSyncRecord(h));
 
             try {
@@ -120,8 +120,6 @@ public class DataInitTask {
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
             }
-
-            h++;
         }
         log.info("Thread {}: {} millis elapsed for populating", threadId, System.currentTimeMillis() - start);
     }
