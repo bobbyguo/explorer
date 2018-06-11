@@ -67,8 +67,8 @@ public class DataInitTask {
     	        log.info("top block: {}", toJSONString(block));
 
     	        final Long goalHeight = block.getHeight();
-//    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
-    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxBlockHeight() - CPU_CORE * 4 * 2000;
+    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxConfirmedBlockHeight();
+//    	        final Long lastConfirmHeight = blockSyncRecordService.getMaxBlockHeight() - CPU_CORE * 4 * 2000;
     	        List<Zone> zoneList = divideZones(lastConfirmHeight, goalHeight);
     	        populateZones(zoneList);
     	        while (EXECUTOR.getActiveCount() > 0) {
