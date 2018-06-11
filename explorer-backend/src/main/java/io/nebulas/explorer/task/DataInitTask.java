@@ -38,7 +38,7 @@ public class DataInitTask {
     private final NebApiServiceWrapper nebApiServiceWrapper;
     private final NebSyncService nebSyncService;
     private static final int CPU_CORE = Runtime.getRuntime().availableProcessors();
-	private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(CPU_CORE * 2, CPU_CORE * 2, 1, TimeUnit.HOURS,
+	private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(CPU_CORE * 4, CPU_CORE * 4, 1, TimeUnit.HOURS,
 			new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
 	static boolean isRunning = false;
@@ -91,7 +91,7 @@ public class DataInitTask {
         Block latestLibBlk = nebApiServiceWrapper.getLatestLibBlock();
         log.info("get latestIrreversibleBlk height={}", latestLibBlk.getHeight());
 
-        for (long h = from; h <= to; ) {
+        for (long h = from; h < to; ) {
             blockSyncRecordService.add(new BlockSyncRecord(h));
 
             try {
@@ -119,7 +119,7 @@ public class DataInitTask {
         }
         final long total = to - from + 1;
 
-        final Long zoneThreshold = 20000L;
+        final Long zoneThreshold = 2000L;
 
         if (total < zoneThreshold) {
             return Arrays.asList(new Zone(from, to));
