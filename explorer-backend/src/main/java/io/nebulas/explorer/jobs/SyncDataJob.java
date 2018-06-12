@@ -12,7 +12,7 @@ public class SyncDataJob {
 	@Autowired
 	private DataInitTask dataInitTask;
 	
-    @Scheduled(cron = "*/10 * * * * ?")
+    @Scheduled(cron = "* */1 * * * ?")
     public void sync() {
     	dataInitTask.init(true);
     }

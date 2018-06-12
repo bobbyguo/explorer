@@ -2,6 +2,8 @@ package io.nebulas.explorer.controller;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -10,6 +12,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -287,12 +290,12 @@ public class RpcController {
 	public JsonResult dapp(@PathVariable("hash") String hash) {
     	String existKey = "dapp-key-" + hash;
     	String valueKey = "dapp-key-" + hash;
-    	if (redisTemplate.opsForValue().setIfAbsent(existKey, "1") || true) {
+    	NebAddress address = nebAddressService.getNebAddressByHash(hash);
+		if (null == address) {
+			return JsonResult.failed();
+		}
+    	if (redisTemplate.opsForValue().setIfAbsent(existKey, "1")) {
     		redisTemplate.expire(existKey, 5, TimeUnit.MINUTES);
-    		NebAddress address = nebAddressService.getNebAddressByHash(hash);
-    		if (null == address) {
-    			return JsonResult.failed();
-    		}
     		if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
     			GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
     			if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
@@ -309,15 +312,20 @@ public class RpcController {
     		}
     		result.put("balance", balance);
     		int page = 1;
-    		int pageSize = 500;
+    		int pageSize = 100;
     		boolean loop = true;
     		List<NebTransaction> txList = Lists.newLinkedList();
+    		List<CompletableFuture<List<NebTransaction>>> cfList = new ArrayList<>();
+    		long txCnt = nebTransactionService.countTxnByTo(hash);
     		do {
-    			List<NebTransaction> list = nebTransactionService.findTxnByTo(hash, page, pageSize);
-    			loop = list.size() == pageSize;
-    			txList.addAll(list);
-    			page++;
+    			final int p = page++;
+    			cfList.add(CompletableFuture.supplyAsync(() -> {
+    				return nebTransactionService.findTxnByTo(hash, p, pageSize);
+    			}));
+    			loop = p*pageSize < txCnt;
     		} while (loop);
+    		
+    		cfList.stream().map(c -> txList.addAll(c.join())).collect(Collectors.toList());
 
     		// Daily active users
     		long dau = 0;
@@ -388,7 +396,7 @@ public class RpcController {
     			Set<String> r = Sets.newLinkedHashSet();
     			do {
     				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
-    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().collect(Collectors.toList()));
     			} while(r.size() < 10);
     			
     			return r.stream().map(e -> {
@@ -424,7 +432,7 @@ public class RpcController {
     			Set<String> r = Sets.newLinkedHashSet();
     			do {
     				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
-    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().limit(10).collect(Collectors.toList()));
+    				r.addAll(list.stream().map(e -> e.getFrom()).distinct().collect(Collectors.toList()));
     			} while(r.size() < 10);
     		
     			return r.stream().map(e -> {
@@ -454,8 +462,26 @@ public class RpcController {
     			}).collect(Collectors.toList());
     		}); 
     		
-    		Future<List<Map<String,Integer>>> trend7days = EXECUTOR.submit(() -> {
-    			return nebTransactionService.recent7days(hash);
+    		Future<List<Map<String,Object>>> trend7days = EXECUTOR.submit(() -> {
+    			List<Map<String, Object>> list = nebTransactionService.recent7days(hash);
+    			int i = 0;
+    			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+    			Date last = new Date();
+    			for (Map<String, Object> map : list) {
+    				last = (Date) map.get("d");
+    				map.put("d", sdf.format(last));
+    				i++;
+    			}
+    			DateTime dt = new DateTime(last);
+    			while (i < 6) {
+    				Map<String, Object> m = new HashMap<>();
+    				dt = dt.minusDays(1);
+    				m.put("d", dt.toString("yyyy-MM-dd"));
+    				m.put("c", 0);
+    				list.add(m);
+    				i++;
+    			}
+    			return list;
     		});
     		
     		try {

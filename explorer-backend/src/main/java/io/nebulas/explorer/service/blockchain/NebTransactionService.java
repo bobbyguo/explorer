@@ -205,6 +205,10 @@ public class NebTransactionService {
         return nebTransactionMapper.findTxnByTo(addressHash, (page - 1) * pageSize, pageSize);
     }
     
+    public long countTxnByTo(String addressHash) {
+        return nebTransactionMapper.countTxnByTo(addressHash);
+    }
+    
     public List<NebTransaction> findTopAccount(String addressHash, int page, int pageSize) {
         if (StringUtils.isEmpty(addressHash)) {
             return Collections.emptyList();
@@ -226,7 +230,7 @@ public class NebTransactionService {
         return nebTransactionMapper.findRecentTxn(addressHash, (page - 1) * pageSize, pageSize);
     }
     
-    public List<Map<String, Integer>> recent7days(String addressHash) {
+    public List<Map<String, Object>> recent7days(String addressHash) {
     	return nebTransactionMapper.recent7days(addressHash);
     }
 

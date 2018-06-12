@@ -1,12 +1,13 @@
 package io.nebulas.explorer.mapper;
 
-import io.nebulas.explorer.domain.BlockSummary;
-import io.nebulas.explorer.domain.NebTransaction;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
-import java.util.Map;
+import io.nebulas.explorer.domain.BlockSummary;
+import io.nebulas.explorer.domain.NebTransaction;
 
 /**
  * the mapper of table neb_transaction
@@ -56,5 +57,7 @@ public interface NebTransactionMapper {
 
     List<NebTransaction> findRecentTxn(@Param("addressHash") String addressHash, @Param("offset") int offset, @Param("limit") int limit);
 
-    List<Map<String, Integer>> recent7days(@Param("addressHash") String addressHash);
+    List<Map<String, Object>> recent7days(@Param("addressHash") String addressHash);
+
+	long countTxnByTo(@Param("addressHash") String addressHash);
 }

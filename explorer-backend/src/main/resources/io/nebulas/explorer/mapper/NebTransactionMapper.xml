@@ -124,6 +124,13 @@
         WHERE `to` = #{addressHash,jdbcType=VARCHAR}
         LIMIT ${offset},${limit}
     </select>
+    
+    <select id="countTxnByTo" parameterType="map">
+        SELECT
+        count(1)
+        FROM `neb_transaction`
+        WHERE `to` = #{addressHash,jdbcType=VARCHAR}
+    </select>
 
     <select id="findTxnOrderById" parameterType="map" resultMap="BaseResultMap">
         SELECT
@@ -187,6 +194,7 @@
         nt.*
         from neb_transaction nt, neb_address na 
         where nt.`to` = #{addressHash,jdbcType=VARCHAR} and nt.`from` = na.`hash`
+        and status = 1
         order by na.current_balance desc
         LIMIT ${offset},${limit}
     </select>
@@ -196,6 +204,7 @@
         <include refid="Base_Column_List"/>
         FROM `neb_transaction`
         WHERE `to` = #{addressHash,jdbcType=VARCHAR}
+        and status = 1
         order by cast(value as decimal(50)) desc 
         LIMIT ${offset},${limit}
     </select>
@@ -205,6 +214,7 @@
         <include refid="Base_Column_List"/>
         FROM `neb_transaction`
         WHERE `to` = #{addressHash,jdbcType=VARCHAR}
+        and status = 1
         order by `timestamp` desc 
         LIMIT ${offset},${limit}
     </select>
