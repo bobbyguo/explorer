@@ -357,14 +357,16 @@ public class RpcController {
 				if (!txList.isEmpty()) {
 					vol24h = txList.parallelStream()
 							.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusHours(24)))
+							.filter(tx -> Integer.valueOf(NebTransactionStatusEnum.SUCCESS.getValue()).equals(tx.getStatus()))
 							.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
 							.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
 					vol7d = txList.parallelStream()
 							.filter(tx -> new DateTime(tx.getTimestamp()).isAfter(DateTime.now().minusDays(7)))
+							.filter(tx -> Integer.valueOf(NebTransactionStatusEnum.SUCCESS.getValue()).equals(tx.getStatus()))
 							.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
 							.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
 					
-					vol = txList.parallelStream()
+					vol = txList.parallelStream().filter(tx -> Integer.valueOf(NebTransactionStatusEnum.SUCCESS.getValue()).equals(tx.getStatus()))
 							.map(tx -> new BigDecimal(tx.getValue())).reduce(new BigDecimal(0), (sum, a) -> sum.add(a))
 							.divide(new BigDecimal(base), 8, RoundingMode.FLOOR).toPlainString();
 				}
