@@ -317,7 +317,7 @@ public class RpcController {
 				List<NebTransaction> txList = Lists.newLinkedList();
 				List<CompletableFuture<List<NebTransaction>>> cfList = new ArrayList<>();
 				long txCnt = nebTransactionService.countTxnByTo(hash);
-				int pageSize = (int) (txCnt / 10);
+				int pageSize = Math.max((int) (txCnt / 10), 10);
 				do {
 					final int p = page++;
 					cfList.add(CompletableFuture.supplyAsync(() -> {
