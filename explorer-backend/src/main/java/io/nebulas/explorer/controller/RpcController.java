@@ -289,7 +289,7 @@ public class RpcController {
     @RequestMapping("/dapp/{hash}")
 	public JsonResult dapp(@PathVariable("hash") String hash) {
     	String existKey = "dapp-key-" + hash;
-    	String valueKey = "dapp-key-" + hash;
+    	String valueKey = "dapp-value-" + hash;
     	NebAddress address = nebAddressService.getNebAddressByHash(hash);
 		if (null == address) {
 			return JsonResult.failed();
@@ -394,10 +394,11 @@ public class RpcController {
     			int p = 1;
     			int ps = 20;
     			Set<String> r = Sets.newLinkedHashSet();
+    			List<NebTransaction> list = Lists.newArrayList();
     			do {
-    				List<NebTransaction> list = nebTransactionService.findTopAccount(hash, p++, ps);
+    				list = nebTransactionService.findTopAccount(hash, p++, ps);
     				r.addAll(list.stream().map(e -> e.getFrom()).distinct().collect(Collectors.toList()));
-    			} while(r.size() < 10);
+    			} while(r.size() < 10 && list.size() > 0);
     			
     			return r.stream().map(e -> {
     				Map<String, String> map = new HashMap<>();
@@ -430,10 +431,11 @@ public class RpcController {
     			int p = 1;
     			int ps = 20;
     			Set<String> r = Sets.newLinkedHashSet();
+    			List<NebTransaction> list = Lists.newArrayList();
     			do {
-    				List<NebTransaction> list = nebTransactionService.findRecentTxn(hash, p++, ps);
+    				list = nebTransactionService.findRecentTxn(hash, p++, ps);
     				r.addAll(list.stream().map(e -> e.getFrom()).distinct().collect(Collectors.toList()));
-    			} while(r.size() < 10);
+    			} while(r.size() < 10 && list.size() > 0);
     		
     			return r.stream().map(e -> {
     				Map<String, String> map = new HashMap<>();
