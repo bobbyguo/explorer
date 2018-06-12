@@ -221,7 +221,7 @@
     
     <select id="recent7days" resultType="map" parameterType="map">
         select * from (select date(`timestamp`) as d, count(1) as c from neb_transaction 
-        where `to` = #{addressHash,jdbcType=VARCHAR} 
+        where `to` = #{addressHash,jdbcType=VARCHAR} and timestamp > date_sub(date(now()), interval 6 day) 
         group by date(timestamp)) a 
         order by d desc  limit 7;
     </select>

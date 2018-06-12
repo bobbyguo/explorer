@@ -468,23 +468,21 @@ public class RpcController {
 				}); 
 				
 				Future<List<Map<String,Object>>> trend7days = EXECUTOR.submit(() -> {
-					List<Map<String, Object>> list = nebTransactionService.recent7days(hash);
-					int i = 0;
-					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-					Date last = new Date();
-					for (Map<String, Object> map : list) {
-						last = (Date) map.get("d");
-						map.put("d", sdf.format(last));
-						i++;
-					}
-					DateTime dt = new DateTime(last);
-					while (i < 6) {
+					List<Map<String, Object>> list = Lists.newArrayList();
+					DateTime now = DateTime.now();
+					for (int k = 0; k < 7; k++) {
 						Map<String, Object> m = new HashMap<>();
-						dt = dt.minusDays(1);
-						m.put("d", dt.toString("yyyy-MM-dd"));
+						m.put("d", now.minusDays(k).toString("yyyy-MM-dd"));
 						m.put("c", 0);
 						list.add(m);
-						i++;
+					}
+					List<Map<String, Object>> dbList = nebTransactionService.recent7days(hash);
+					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+					Date last = new Date();
+					for (Map<String, Object> map : dbList) {
+						last = (Date) map.get("d");
+						String dv = sdf.format(last);
+						list.stream().filter(e -> e.get("d").equals(dv)).findFirst().get().put("c", map.get("c"));
 					}
 					return list;
 				});
