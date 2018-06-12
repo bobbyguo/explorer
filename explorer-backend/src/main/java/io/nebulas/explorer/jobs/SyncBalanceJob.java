@@ -24,7 +24,7 @@ public class SyncBalanceJob {
     private final NebApiServiceWrapper nebApiServiceWrapper;
     static boolean isRuning = false;
 	
-	@Scheduled(cron = "* * */1 * * ?")
+	@Scheduled(cron = "* * 0/2 * * ?")
 	public void sync() {
 		if (isRuning) return;
 		try {
@@ -37,7 +37,7 @@ public class SyncBalanceJob {
 				List<NebAddress> addresses = nebAddressService.findAddressOrderByBalance(page++, pageSize);
 				loop = addresses.size() == pageSize;
 				addresses.parallelStream().forEach(address -> {
-					if (address.getUpdatedAt().before(LocalDateTime.now().plusSeconds(-5).toDate())) {
+					if (address.getUpdatedAt().before(LocalDateTime.now().minusMinutes(5).toDate())) {
 						GetAccountStateResponse accountState = nebApiServiceWrapper.getAccountState(address.getHash());
 						if (null != accountState && StringUtils.isNotEmpty(accountState.getBalance())) {
 							String balance = accountState.getBalance();
