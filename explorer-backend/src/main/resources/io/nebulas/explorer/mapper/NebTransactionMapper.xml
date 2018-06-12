@@ -125,7 +125,7 @@
         LIMIT ${offset},${limit}
     </select>
     
-    <select id="countTxnByTo" parameterType="map">
+    <select id="countTxnByTo" parameterType="map" resultType="long">
         SELECT
         count(1)
         FROM `neb_transaction`
